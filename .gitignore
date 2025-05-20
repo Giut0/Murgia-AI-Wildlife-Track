@@ -173,10 +173,9 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-data/*
+data/labeled_img/*
 
-!data/
+data/labeled_videos/*
 
-img/*
+data/unlabeled_videos/*
 
-!img/

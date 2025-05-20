@@ -1,35 +1,67 @@
 import re
 import cv2 as cv
 from PIL import Image
+import os
+from dateutil import parser
 
-def estrai_data_ora(ocr_text):
-    # Pulizia spazi anomali tipo "20:14 :19" → "20:14:19"
+
+def normalize_datetime(date_str):
+    try:
+        dt = parser.parse(date_str, dayfirst=True)  
+        return dt.isoformat()
+    except Exception as e:
+        return None
+    
+def get_unique_filename(path):
+    if not os.path.exists(path):
+        return path
+
+    base, ext = os.path.splitext(path)
+    counter = 1
+    new_path = f"{base} ({counter}){ext}"
+    
+    while os.path.exists(new_path):
+        counter += 1
+        new_path = f"{base} ({counter}){ext}"
+
+    return new_path
+
+def translate_filename(filename, trans_dic):
+
+    filename = filename.lower()
+
+    for eng_label, italian_words in trans_dic.items():
+        for italian_word in italian_words:
+            if italian_word in filename:
+                return eng_label
+
+    return "unknown"
+
+def extract_date_time(ocr_text):
+    # Clean up the OCR text
     ocr_text = re.sub(r'(\d{2}:\d{2})\s?:\s?(\d{2})', r'\1:\2', ocr_text)
 
-    # Possibili pattern combinati (data + ora in una stringa)
+    # Types of date and time formats
     date_time_patterns = [
-        # Orario PRIMA della data
-        r"\b(?P<ora>\d{2}[:\-]\d{2}[:\-]\d{2})[ ]+(?P<data>\d{2}[\/\-\.]\d{1,3}[\/\-\.]\d{2,4})\b",
-        r"\b(?P<ora>\d{2}[:\-]\d{2}[:\-]\d{2})[ ]+(?P<data>\d{4}[\/\-\.]\d{2}[\/\-\.]\d{2})\b",
-
-        # Data PRIMA dell'orario
-        r"\b(?P<data>\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})[ ]+(?P<ora>\d{2}[:\-]\d{2}[:\-]\d{2})\b",
-        r"\b(?P<data>\d{4}[\/\-\.]\d{2}[\/\-\.]\d{2})[ ]+(?P<ora>\d{2}[:\-]\d{2}[:\-]\d{2})\b",
-        r"\b(?P<data>\d{2}[\/\-\.]\d{2}[\/\-\.]\d{2})[ ]+(?P<ora>\d{2}[:\-]\d{2}[:\-]\d{2})\b",
+        r"\b(?P<time>\d{2}[:\-]\d{2}[:\-]\d{2})[ ]+(?P<date>\d{2}[\/\-\.]\d{1,3}[\/\-\.]\d{2,4})\b",
+        r"\b(?P<time>\d{2}[:\-]\d{2}[:\-]\d{2})[ ]+(?P<date>\d{4}[\/\-\.]\d{2}[\/\-\.]\d{2})\b",
+        r"\b(?P<date>\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})[ ]+(?P<time>\d{2}[:\-]\d{2}[:\-]\d{2})\b",
+        r"\b(?P<date>\d{4}[\/\-\.]\d{2}[\/\-\.]\d{2})[ ]+(?P<time>\d{2}[:\-]\d{2}[:\-]\d{2})\b",
+        r"\b(?P<date>\d{2}[\/\-\.]\d{2}[\/\-\.]\d{2})[ ]+(?P<time>\d{2}[:\-]\d{2}[:\-]\d{2})\b",
     ]
 
     for pattern in date_time_patterns:
         match = re.search(pattern, ocr_text)
         if match:
-            return match.group('data'), match.group('ora')
+            return match.group('date'), match.group('time')
 
-    return None, None  # Se nessun match
+    return None, None
 
 def get_best_frame(video, detection_model, conf_threshold, frame_interval):
-    # Function to get the detected frame
     best_conf = 0.0
     best_frame = None
     frame_count = 0
+    best_bounding_box = None
     while video.isOpened():
         ret, frame = video.read()
         if not ret:
