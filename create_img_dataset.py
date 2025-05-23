@@ -4,6 +4,7 @@ import torch
 import easyocr
 import cv2 as cv
 from utils import *
+import pandas as pd
 from megadetector.detection import run_detector
 
 trans_dic = {
@@ -38,7 +39,7 @@ output_csv = 'data/labeled_img/labeled_img.csv'
 
 with open(output_csv, mode='w', newline='') as file:
     writer = csv.writer(file)
-    writer.writerow(['filepath', 'classe', 'timestamp', 'x_min', 'y_min', 'width', 'height'])
+    writer.writerow(['filepath', 'class', 'timestamp', 'x_min', 'y_min', 'width', 'height'])
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
         if os.path.isfile(file_path):
@@ -60,7 +61,7 @@ with open(output_csv, mode='w', newline='') as file:
                     data_str, ora_str = extract_date_time(full_text)
 
                     if data_str is None or ora_str is None:
-                            timestamp = "none"
+                            timestamp = pd.NaT
                     else:
                         timestamp = normalize_datetime(data_str + " " + ora_str)
                     # Write the data to the CSV file
