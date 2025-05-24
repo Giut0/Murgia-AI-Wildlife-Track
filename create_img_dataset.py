@@ -65,6 +65,6 @@ with open(output_csv, mode='w', newline='') as file:
                     else:
                         timestamp = normalize_datetime(data_str + " " + ora_str)
                     # Write the data to the CSV file
-                    writer.writerow([safe_filename, label, timestamp, best_bounding_box[0], best_bounding_box[1], best_bounding_box[2], best_bounding_box[3]])
+                    writer.writerow([label+".png", label, timestamp, best_bounding_box[0], best_bounding_box[1], best_bounding_box[2], best_bounding_box[3]])
             else:
                 pass
