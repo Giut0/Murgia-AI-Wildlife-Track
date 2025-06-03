@@ -2,11 +2,11 @@ import pandas as pd
 import os
 from PIL import Image
 import torch
-
+from torchvision import transforms
 
 class AnimalDataset(torch.utils.data.Dataset):
-    def __init__(self, csv_file, image_dir, transform=None, crop_bbox=False, label_map=None):
-        self.df = pd.read_csv(csv_file)
+    def __init__(self, dataset, image_dir, transform=None, crop_bbox=False, label_map=None):
+        self.df = dataset
         self.image_dir = image_dir
         self.transform = transform
         self.crop_bbox = crop_bbox
@@ -89,3 +89,63 @@ def eval_model(model, dataloader, criterion, device):
     epoch_loss = running_loss / total
     epoch_acc = correct / total
     return epoch_loss, epoch_acc
+
+from PIL import Image
+import os
+from collections import Counter
+import torch
+from torchvision.transforms import ToTensor, ToPILImage
+
+def augment_minority_classes(df, image_dir, output_dir, transform_fn, min_samples=50, save_csv_path=None, device=None):
+    os.makedirs(output_dir, exist_ok=True)
+    class_counts = Counter(df['class'])
+
+    augmented_rows = []
+
+    to_tensor = ToTensor()
+    to_pil = ToPILImage()
+
+    for cls in class_counts:
+        count = class_counts[cls]
+        if count >= min_samples:
+            continue
+
+        needed = min_samples - count
+        class_df = df[df['class'] == cls]
+
+        for i in range(needed):
+            row = class_df.iloc[i % len(class_df)]
+            img_path = os.path.join(image_dir, row['filepath'])
+
+            try:
+                image = Image.open(img_path).convert("RGB")
+            except Exception as e:
+                print(f"Error {img_path}: {e}")
+                continue
+
+            img_tensor = to_tensor(image).unsqueeze(0).to(device)
+
+            with torch.no_grad():
+                aug_tensor = transform_fn(img_tensor) 
+
+            aug_tensor_cpu = aug_tensor.squeeze(0).cpu()
+            aug_image = to_pil(aug_tensor_cpu)
+
+            # Save the augmented image
+            filename, ext = os.path.splitext(os.path.basename(row['filepath']))
+            new_filename = f"{filename}_aug_{i}{ext}"
+            new_path = os.path.join(output_dir, new_filename)
+            aug_image.save(new_path)
+            print(f"Saved: {new_path}")
+
+            new_row = row.copy()
+            new_row['filepath'] = os.path.relpath(new_path, output_dir)
+            augmented_rows.append(new_row)
+
+    augmented_df = pd.DataFrame(augmented_rows)
+    full_df = pd.concat([df, augmented_df], ignore_index=True)
+
+    if save_csv_path:
+        full_df.to_csv(save_csv_path, index=False)
+
+    return full_df

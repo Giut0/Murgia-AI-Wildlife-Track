@@ -22,7 +22,7 @@ kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
 # Load dataset
 animals_dataset = pd.read_csv('data/labeled_img/labeled_img.csv')
-
+'''
 # Accorpa le classi con meno di n_splits campioni in 'other'
 min_samples = n_splits
 class_counts = animals_dataset['class'].value_counts()
@@ -36,5 +36,5 @@ def map_class(x):
 animals_dataset['class'] = animals_dataset['class'].map(map_class)
 
 print("Classi rare accorpate in 'other'.")
-
+'''
 split_folds(animals_dataset, 'data/fold_split', kf)

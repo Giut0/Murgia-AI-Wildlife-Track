@@ -35,7 +35,7 @@ CONFIDENCE_THRESHOLD_EARLY_STOP = 0.80
 frame_interval = 5  # Analyze every 5th frame
 
 folder_path = 'data/labeled_videos'
-output_csv = 'data/labeled_img/labeled_img.csv'
+output_csv = 'data/labeled_img.csv'
 
 with open(output_csv, mode='w', newline='') as file:
     writer = csv.writer(file)
