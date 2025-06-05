@@ -2,7 +2,9 @@ import pandas as pd
 import os
 from PIL import Image
 import torch
-from torchvision import transforms
+from sklearn.metrics import accuracy_score, roc_auc_score, fbeta_score, precision_score, recall_score, confusion_matrix
+import numpy as np
+from torch.utils.data import DataLoader 
 
 class AnimalDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, image_dir, transform=None, crop_bbox=False, label_map=None):
@@ -149,3 +151,99 @@ def augment_minority_classes(df, image_dir, output_dir, transform_fn, min_sample
         full_df.to_csv(save_csv_path, index=False)
 
     return full_df
+
+
+def extract_features(model, dataloader, device):
+    features = []
+    labels = []
+
+    with torch.no_grad():
+        for images, targets in dataloader:
+            images = images.to(device)
+            out = model(images)
+            features.append(out.cpu().numpy())
+            labels.append(targets.numpy())
+
+    features = np.concatenate(features, axis=0)
+    labels = np.concatenate(labels, axis=0)
+    return features, labels
+
+def cross_validation(base_dir, model, k, device, transform, label_map, model_feat=None):
+
+    results = []
+
+    for fold_num in range(1, k+1):
+        fold_dir = os.path.join(base_dir, f"fold_{fold_num}")
+        
+        # Load current folder datasets
+        train_path = os.path.join(fold_dir, "train.csv")
+        test_path = os.path.join(fold_dir, "test.csv")
+        
+        train_data = pd.read_csv(train_path)
+        test_data = pd.read_csv(test_path)
+
+        # Dataset and DataLoader
+        train_ds = AnimalDataset(train_data, "data/labeled_img_aug", transform=transform, label_map=label_map, crop_bbox=False)
+        train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
+        test_ds = AnimalDataset(test_data, "data/labeled_img_aug", transform=transform, label_map=label_map, crop_bbox=False)
+        test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)  
+
+        X_train_validation, y_train_validation = extract_features(model_feat, train_loader, device)
+        X_test_validation, y_test_validation = extract_features(model_feat, test_loader, device)
+        
+        # Learning 
+        model.fit(X_train_validation, y_train_validation)
+        
+        # Get metrics
+        val_predictions = model.predict(X_test_validation)
+        val_accuracy = accuracy_score(y_test_validation, val_predictions)
+        precision = precision_score(y_test_validation, val_predictions, zero_division=0, average=None)
+        recall = recall_score(y_test_validation, val_predictions, zero_division=0, average=None)
+        f1score = fbeta_score(y_test_validation, val_predictions, beta=1, zero_division=0, average=None)
+        conf = confusion_matrix(y_test_validation, val_predictions)
+                
+        # Save results for each folder
+        results.append({
+            'fold': fold_num,
+            'val_accuracy': val_accuracy,
+            'precision' : precision,
+            'recall' : recall,
+            'f1score' : f1score,
+            'confusion_matrix' : conf.flatten()
+        })
+    return results
+
+def print_cross_validation_results(results):
+    accuracy_values = [result['val_accuracy'] for result in results]
+    precision_values = [result['precision'] for result in results]
+    recall_values = [result['recall'] for result in results]
+    f1score_values = [result['f1score'] for result in results]
+    conf_matrices_flat = [np.array(r['confusion_matrix']) for r in results]
+    n_classes = int(np.sqrt(len(conf_matrices_flat[0])))
+
+    conf_matrices = np.stack([cm.reshape(n_classes, n_classes) for cm in conf_matrices_flat])
+
+    # Mean
+    accuracy_mean= np.average(accuracy_values)
+    precision_mean= np.average(precision_values)
+    recall_mean= np.average(recall_values)
+    f1score_mean= np.average(f1score_values)
+    conf_matrices_mean= np.mean(conf_matrices, axis=0)
+
+    # Standard deviation
+    accuracy_std = np.std(accuracy_values)
+    precision_std = np.std(precision_values)
+    recall_std = np.std(recall_values)
+    f1score_std = np.std(f1score_values)
+    conf_matrices_std = np.std(conf_matrices, axis=0)
+
+    print(f"Accuracy: {accuracy_mean:.4f} ± {accuracy_std:.4f}")
+    print(f"Precision: {precision_mean:.4f} ± {precision_std:.4f}")
+    print(f"Recall: {recall_mean:.4f} ± {recall_std:.4f}")
+    print(f"f1score: {f1score_mean:.4f} ± {f1score_std:.4f}")
+    print("Confusion matrix:")
+    for i in range(n_classes):
+        row = ""
+        for j in range(n_classes):
+            row += f"{conf_matrices_mean[i, j]:5.1f}±{conf_matrices_std[i, j]:.1f}  "
+        print(row)

@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 # Load dataset to split
-df = pd.read_csv("data/labeled_img/labeled_img.csv")
+df = pd.read_csv("data/labeled_img.csv")
 
 class_counts = df['class'].value_counts()
 
