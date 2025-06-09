@@ -178,9 +178,11 @@ data/labeled_img/*
 data/labeled_videos/*
 
 data/unlabeled_videos/*
-
+data/labeled_img_aug/*
+data/cropped_images/*
+!data/cropped_images/
 !data/labeled_img/
-
+!data/labeled_img_aug/
 !data/labeled_videos/
 
 !data/unlabeled_videos/
