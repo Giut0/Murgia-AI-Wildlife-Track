@@ -87,6 +87,7 @@ def augment_minority_classes(df, image_dir, output_dir, transform_fn, min_sample
             filename, ext = os.path.splitext(os.path.basename(row['filepath']))
             new_filename = f"{filename}_aug_{i}{ext}"
             new_path = os.path.join(output_dir, new_filename)
+            image.save(new_path)
             aug_image.save(new_path)
             print(f"Saved: {new_path}")
 

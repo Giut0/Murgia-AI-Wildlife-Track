@@ -36,8 +36,8 @@ frame_interval = 5  # Analyze every 5th frame
 
 folder_path = 'data/labeled_videos'
 output_csv = 'data/labeled_img.csv'
-
-with open(output_csv, mode='w', newline='') as file:
+iid = 671
+with open(output_csv, mode='a', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['filepath', 'class', 'timestamp', 'x_min', 'y_min', 'width', 'height'])
     for filename in os.listdir(folder_path):

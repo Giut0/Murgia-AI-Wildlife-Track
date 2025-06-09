@@ -19,7 +19,7 @@ augmented_df = augment_minority_classes(
     image_dir="data/cropped_images/",
     output_dir="data/labeled_img_aug/",
     transform_fn=minority_augmentation,
-    min_samples=50,
+    min_samples=75,
     save_csv_path="data/labeled_img_augmented.csv",
     device=device
 )
