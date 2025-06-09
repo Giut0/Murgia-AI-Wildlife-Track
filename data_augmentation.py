@@ -2,7 +2,10 @@ from training_utils import augment_minority_classes
 from torchvision import transforms
 import pandas as pd
 import torch
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Define the augmentation transformations for minority classes
 minority_augmentation = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.RandomRotation(20),

@@ -1,10 +1,15 @@
-import pandas as pd
 import os
-from PIL import Image
+import timm
 import torch
-from sklearn.metrics import accuracy_score, roc_auc_score, fbeta_score, precision_score, recall_score, confusion_matrix
 import numpy as np
-from torch.utils.data import DataLoader 
+from PIL import Image
+from collections import Counter
+from torchvision.transforms import ToTensor, ToPILImage
+from torch.utils.data import DataLoader
+import pandas as pd
+import timm
+import torch.nn as nn
+from sklearn.metrics import accuracy_score, fbeta_score, precision_score, recall_score, confusion_matrix
 
 class AnimalDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, image_dir, transform=None, crop_bbox=False, label_map=None):
@@ -25,11 +30,11 @@ class AnimalDataset(torch.utils.data.Dataset):
         row = self.df.iloc[idx]
         img_path = os.path.join(self.image_dir, row['filepath'])
 
-        # Carica immagine
+        # Load image
         image = Image.open(img_path).convert("RGB")
         w, h = image.size
 
-        # Bounding box (relativo -> assoluto)
+        # Bounding box calulations
         if self.crop_bbox:
             x_min = int(row['x_min'] * w)
             y_min = int(row['y_min'] * h)
@@ -42,61 +47,6 @@ class AnimalDataset(torch.utils.data.Dataset):
 
         label = self.label_map[row['class']]
         return image, label
-    
-
-# Training function
-def train_epoch(model, dataloader, optimizer, criterion, device):
-    model.train()
-    running_loss = 0.0
-    correct = 0
-    total = 0
-    for images, labels in dataloader:
-        images = images.to(device)
-        labels = labels.to(device)
-
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        running_loss += loss.item() * images.size(0)
-        _, predicted = outputs.max(1)
-        total += labels.size(0)
-        correct += predicted.eq(labels).sum().item()
-
-    epoch_loss = running_loss / total
-    epoch_acc = correct / total
-    return epoch_loss, epoch_acc
-
-# Validation function
-def eval_model(model, dataloader, criterion, device):
-    model.eval()
-    running_loss = 0.0
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for images, labels in dataloader:
-            images = images.to(device)
-            labels = labels.to(device)
-
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-
-            running_loss += loss.item() * images.size(0)
-            _, predicted = outputs.max(1)
-            total += labels.size(0)
-            correct += predicted.eq(labels).sum().item()
-
-    epoch_loss = running_loss / total
-    epoch_acc = correct / total
-    return epoch_loss, epoch_acc
-
-from PIL import Image
-import os
-from collections import Counter
-import torch
-from torchvision.transforms import ToTensor, ToPILImage
 
 def augment_minority_classes(df, image_dir, output_dir, transform_fn, min_samples=50, save_csv_path=None, device=None):
     os.makedirs(output_dir, exist_ok=True)
@@ -247,3 +197,147 @@ def print_cross_validation_results(results):
         for j in range(n_classes):
             row += f"{conf_matrices_mean[i, j]:5.1f}±{conf_matrices_std[i, j]:.1f}  "
         print(row)
+
+# Training function
+def train_epoch(model, dataloader, optimizer, criterion, device):
+    model.train()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+    for images, labels in dataloader:
+        images = images.to(device)
+        labels = labels.to(device)
+
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item() * images.size(0)
+        _, predicted = outputs.max(1)
+        total += labels.size(0)
+        correct += predicted.eq(labels).sum().item()
+
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+    return epoch_loss, epoch_acc
+
+# Validation function
+def eval_model(model, dataloader, criterion, device):
+    model.eval()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for images, labels in dataloader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+            running_loss += loss.item() * images.size(0)
+            _, predicted = outputs.max(1)
+            total += labels.size(0)
+            correct += predicted.eq(labels).sum().item()
+
+    epoch_loss = running_loss / total
+    epoch_acc = correct / total
+    return epoch_loss, epoch_acc
+
+def evaluate_model(model, dataloader, device, label_map):
+    model.eval()
+    all_preds = []
+    all_labels = []
+
+    with torch.no_grad():
+        for images, labels in dataloader:
+            images = images.to(device)
+            labels = labels.to(device)
+            outputs = model(images)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    # Ricava classi presenti nel test
+    unique_labels = sorted(list(set(all_labels + all_preds)))
+    inv_label_map = {v: k for k, v in label_map.items()}
+
+    cm = confusion_matrix(all_labels, all_preds, labels=unique_labels)
+
+    return all_labels, all_preds, cm
+
+def build_model(label_map, device, frozen=True):
+    model = timm.create_model('vit_base_patch16_224', pretrained=True)
+    model.head = nn.Linear(model.head.in_features, len(label_map))
+
+    if frozen:
+        # Frozen the entire model except the head
+        for param in model.parameters():
+            param.requires_grad = False
+        for param in model.head.parameters():
+            param.requires_grad = True
+    else:
+        # Make all parameters trainable
+        for param in model.parameters():
+            param.requires_grad = True
+
+    return model.to(device)
+
+
+def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5, frozen=True):
+    results = []
+    patience = 3
+    best_val_acc = 0.0
+    epochs_no_improve = 0
+
+    for fold_num in range(1, k + 1):
+        # Load current fold datasets
+        fold_dir = os.path.join(base_dir, f"fold_{fold_num}")
+        train_data = pd.read_csv(os.path.join(fold_dir, "train.csv"))
+        test_data = pd.read_csv(os.path.join(fold_dir, "test.csv"))
+
+        train_ds = AnimalDataset(train_data, "data/labeled_img_aug", transform=transform, label_map=label_map, crop_bbox=False)
+        train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
+
+        test_ds = AnimalDataset(test_data, "data/labeled_img_aug", transform=transform, label_map=label_map, crop_bbox=False)
+        test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)
+
+        # Build model
+        model = build_model(label_map, device, frozen=frozen)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
+        criterion = nn.CrossEntropyLoss()
+        # Training loop
+        for epoch in range(num_epochs):
+            train_loss, train_acc = train_epoch(model, train_loader, optimizer, criterion, device)
+            val_loss, val_acc = eval_model(model, test_loader, criterion, device)
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                epochs_no_improve = 0
+            else:
+                epochs_no_improve += 1
+
+            if epochs_no_improve >= patience:
+                print(f"Early stopping at epoch {epoch+1}")
+                break
+
+        all_labels, all_preds, conf_matrix = evaluate_model(model, test_loader, device, label_map)
+
+        # Get metrics
+        val_accuracy = accuracy_score(all_labels, all_preds)
+        precision = precision_score(all_labels, all_preds, zero_division=0, average=None)
+        recall = recall_score(all_labels, all_preds, zero_division=0, average=None)
+        f1score = fbeta_score(all_labels, all_preds, beta=1, zero_division=0, average=None)
+
+        # Save results for each folder
+        results.append({
+            'fold': fold_num,
+            'val_accuracy': val_accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1score': f1score,
+            'confusion_matrix': conf_matrix.flatten()
+        })
+
+    return results

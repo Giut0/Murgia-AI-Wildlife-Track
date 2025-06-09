@@ -20,11 +20,11 @@ def split_folds(df, base_dir, kf):
 n_splits = 5
 kf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
-# Load dataset
+# Load datasets
 animals_dataset = pd.read_csv('data/labeled_img.csv')
 animals_dataset_augmented = pd.read_csv('data/labeled_img_augmented.csv')
 
-# Accorpa le classi con meno di n_splits campioni in 'other'
+# Map classes with fewer samples to 'other'
 min_samples = n_splits
 class_counts = animals_dataset['class'].value_counts()
 
