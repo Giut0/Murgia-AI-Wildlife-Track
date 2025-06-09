@@ -35,9 +35,9 @@ CONFIDENCE_THRESHOLD_EARLY_STOP = 0.80
 frame_interval = 5  # Analyze every 5th frame
 
 folder_path = 'data/labeled_videos'
-output_csv = 'data/labeled_img/labeled_img.csv'
-
-with open(output_csv, mode='w', newline='') as file:
+output_csv = 'data/labeled_img.csv'
+iid = 671
+with open(output_csv, mode='a', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['filepath', 'class', 'timestamp', 'x_min', 'y_min', 'width', 'height'])
     for filename in os.listdir(folder_path):
@@ -65,6 +65,6 @@ with open(output_csv, mode='w', newline='') as file:
                     else:
                         timestamp = normalize_datetime(data_str + " " + ora_str)
                     # Write the data to the CSV file
-                    writer.writerow([safe_filename, label, timestamp, best_bounding_box[0], best_bounding_box[1], best_bounding_box[2], best_bounding_box[3]])
+                    writer.writerow([label+".png", label, timestamp, best_bounding_box[0], best_bounding_box[1], best_bounding_box[2], best_bounding_box[3]])
             else:
                 pass
