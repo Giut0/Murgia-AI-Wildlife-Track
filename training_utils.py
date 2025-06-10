@@ -8,6 +8,7 @@ from torchvision.transforms import ToTensor, ToPILImage
 from torch.utils.data import DataLoader
 import pandas as pd
 import timm
+import joblib
 import torch.nn as nn
 from sklearn.metrics import accuracy_score, fbeta_score, precision_score, recall_score, confusion_matrix
 
@@ -119,10 +120,10 @@ def extract_features(model, dataloader, device):
     labels = np.concatenate(labels, axis=0)
     return features, labels
 
-def cross_validation(base_dir, model, k, device, transform, label_map, model_feat=None):
+def cross_validation(base_dir, model, k, device, transform, label_map, model_feat=None, save_model_path=None):
 
     results = []
-
+    best_f1 = 0.0
     for fold_num in range(1, k+1):
         fold_dir = os.path.join(base_dir, f"fold_{fold_num}")
         
@@ -150,8 +151,15 @@ def cross_validation(base_dir, model, k, device, transform, label_map, model_fea
         val_accuracy = accuracy_score(y_test_validation, val_predictions)
         precision = precision_score(y_test_validation, val_predictions, zero_division=0, average=None)
         recall = recall_score(y_test_validation, val_predictions, zero_division=0, average=None)
-        f1score = fbeta_score(y_test_validation, val_predictions, beta=1, zero_division=0, average=None)
+        f1score = fbeta_score(y_test_validation, val_predictions, beta=1, zero_division=0, average="macro")
         conf = confusion_matrix(y_test_validation, val_predictions)
+
+        f1score_compare = f1score
+        if save_model_path is not None:
+            if f1score_compare > best_f1:
+                best_f1 = f1score_compare
+                joblib.dump(model, save_model_path)
+                print(f"Model saved at {save_model_path} with f1score {best_f1:.4f}")
                 
         # Save results for each folder
         results.append({
@@ -287,11 +295,12 @@ def build_model(label_map, device, frozen=True):
     return model.to(device)
 
 
-def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5, frozen=True):
+def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5, frozen=True, save_model_path=None):
     results = []
     patience = 3
     best_val_acc = 0.0
     epochs_no_improve = 0
+    best_f1 = 0.0
 
     for fold_num in range(1, k + 1):
         # Load current fold datasets
@@ -329,7 +338,14 @@ def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5,
         val_accuracy = accuracy_score(all_labels, all_preds)
         precision = precision_score(all_labels, all_preds, zero_division=0, average=None)
         recall = recall_score(all_labels, all_preds, zero_division=0, average=None)
-        f1score = fbeta_score(all_labels, all_preds, beta=1, zero_division=0, average=None)
+        f1score = fbeta_score(all_labels, all_preds, beta=1, zero_division=0, average="macro")
+
+        f1score_compare = f1score
+        if save_model_path is not None:
+            if f1score_compare > best_f1:
+                best_f1 = f1score_compare
+                torch.save(model.state_dict(), save_model_path)
+                print(f"Model saved at {save_model_path} with f1score {best_f1:.4f}")
 
         # Save results for each folder
         results.append({
