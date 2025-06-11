@@ -1,12 +1,12 @@
 # 🦊 Wildlife Classification on Video from Phototraps in the Alta Murgia Park.
-Final project for Computer Vision 24-25 course 
+Final project for Computer Vision 24-25 course.
 
 ## 🎯 Goal 
 Improve the efficiency of wildlife monitoring in Alta Murgia National Park by automating the process of species identification and classification and providing useful data for biodiversity management.
 
 ## 📝 Project description
 
-This project aims to classify the fauna in videos captured by phototraps placed in the Alta Murgia National Park. 
+This project aims to classify the fauna in videos captured by camera traps placed in the Alta Murgia National Park. 
 The videos were processed automatically using an approach combining data augmentation and classification techniques. In particular, two main approaches were evaluated for the training phase:
 
 1. **Hybrid approach**: vitDet was employed as a feature extractor for images, then using these representations to train traditional classifiers;
@@ -15,14 +15,14 @@ The videos were processed automatically using an approach combining data augment
 Careful evaluation of the performance of the models followed, with the goal of identifying the one most effective in classifying the animal represented in each image.
 
 ## 🗃️ Data origin 
-The videos used in this project came from different phototraps located in the territory of Alta Murgia National Park. The data capture different species of local fauna in diurnal and nocturnal setting in order to study their behavior and (numero...).
-**Forse: dire che proviene da un progetto fatto da ...**
+The videos used in this project were collected and documented by Mongelli Giuseppe and Lacetera Tommaso from various camera traps located throughout the territory of the Alta Murgia National Park. The footage captures different species of local fauna in both diurnal and nocturnal settings, with the aim of studying the number of species present in the area of interest, their behavior, relative abundances, land use, and both interspecific and intraspecific interactions.
+
 ## 🛠️ Pipeline
 
 The wildlife classification pipeline consists of the following steps:
 
 1.  **Video Acquisition:**
-    * Videos are collected from **phototraps** placed in the Alta Murgia National Park.
+    * Videos are collected from **camera traps** placed in the Alta Murgia National Park.
 
 2.  **Frame Extraction and Bounding Box (MegaDetector):**
     * Use of [**MegaDetector**](https://github.com/microsoft/CameraTraps/tree/main) to identify events and select the representative **best frame**.
@@ -44,58 +44,63 @@ The wildlife classification pipeline consists of the following steps:
 
 ## 📊 Results Analysis
 Below there are the metrics of the best models of different training methods came out of the 5 fold cross validation.
-<div align="center">
-  <table border="1">
-    <tr>
-      <th colspan="2" align="center"><b>Logistic Regression</b></th>
-    </tr>
-    <tr>
-      <th>Metric</th>
-      <th>Value (mean ± std)</th>
-    </tr>
-    <tr>
-      <td>Accuracy</td>
-      <td>0.9811 ± 0.0115</td>
-    </tr>
-    <tr>
-      <td>Precision</td>
-      <td>0.9779 ± 0.0462</td>
-    </tr>
-    <tr>
-      <td>Recall</td>
-      <td>0.9823 ± 0.0441</td>
-    </tr>
-    <tr>
-      <td>F1-score</td>
-      <td>0.9793 ± 0.0123</td>
-    </tr>
-  </table>
-</div>
 
-<div align="center">
-  <table border="1">
-    <tr>
-      <th colspan="2" align="center"><b>VitDet finetuned frozen backbone</b></th>
-    </tr>
-    <tr>
-      <th>Metric</th>
-      <th>Value (mean ± std)</th>
-    </tr>
-    <tr>
-      <td>Accuracy</td>
-      <td>0.9492 ± 0.0114</td>
-    </tr>
-    <tr>
-      <td>Precision</td>
-      <td>0.9390 ± 0.0876</td>
-    </tr>
-    <tr>
-      <td>Recall</td>
-      <td>0.9367 ± 0.1087</td>
-    </tr>
-    <tr>
-      <td>F1-score</td>
-      <td>0.9322 ± 0.0177</td>
-    </tr>
-  </table>
+<div style="display: flex; justify-content: center; gap: 40px;">
+
+  <div>
+    <table border="1">
+      <tr>
+        <th colspan="2" align="center"><b>Logistic Regression</b></th>
+      </tr>
+      <tr>
+        <th>Metric</th>
+        <th>Value (mean ± std)</th>
+      </tr>
+      <tr>
+        <td>Accuracy</td>
+        <td>0.9811 ± 0.0115</td>
+      </tr>
+      <tr>
+        <td>Precision</td>
+        <td>0.9779 ± 0.0462</td>
+      </tr>
+      <tr>
+        <td>Recall</td>
+        <td>0.9823 ± 0.0441</td>
+      </tr>
+      <tr>
+        <td>F1-score</td>
+        <td>0.9793 ± 0.0123</td>
+      </tr>
+    </table>
+  </div>
+
+  <div>
+    <table border="1">
+      <tr>
+        <th colspan="2" align="center"><b>VitDet finetuned frozen backbone</b></th>
+      </tr>
+      <tr>
+        <th>Metric</th>
+        <th>Value (mean ± std)</th>
+      </tr>
+      <tr>
+        <td>Accuracy</td>
+        <td>0.9492 ± 0.0114</td>
+      </tr>
+      <tr>
+        <td>Precision</td>
+        <td>0.9390 ± 0.0876</td>
+      </tr>
+      <tr>
+        <td>Recall</td>
+        <td>0.9367 ± 0.1087</td>
+      </tr>
+      <tr>
+        <td>F1-score</td>
+        <td>0.9322 ± 0.0177</td>
+      </tr>
+    </table>
+  </div>
+
 </div>
