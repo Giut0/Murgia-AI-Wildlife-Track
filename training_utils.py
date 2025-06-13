@@ -280,7 +280,8 @@ def evaluate_model(model, dataloader, device, label_map):
 def build_model(label_map, device, frozen=True):
     model = timm.create_model('vit_base_patch16_224', pretrained=True)
     model.head = nn.Linear(model.head.in_features, len(label_map))
-
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
+    criterion = nn.CrossEntropyLoss()
     if frozen:
         # Frozen the entire model except the head
         for param in model.parameters():
@@ -292,7 +293,7 @@ def build_model(label_map, device, frozen=True):
         for param in model.parameters():
             param.requires_grad = True
 
-    return model.to(device)
+    return model.to(device), optimizer, criterion
 
 
 def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5, frozen=True, save_model_path=None):
@@ -315,9 +316,8 @@ def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5,
         test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)
 
         # Build model
-        model = build_model(label_map, device, frozen=frozen)
-        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
-        criterion = nn.CrossEntropyLoss()
+        model,optimizer, criterion = build_model(label_map, device, frozen=frozen)
+        
         # Training loop
         for epoch in range(num_epochs):
             train_loss, train_acc = train_epoch(model, train_loader, optimizer, criterion, device)
