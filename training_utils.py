@@ -1,15 +1,16 @@
 import os
 import timm
 import torch
+import joblib
 import numpy as np
-from PIL import Image
-from collections import Counter
-from torchvision.transforms import ToTensor, ToPILImage
-from torch.utils.data import DataLoader
 import pandas as pd
-import timm
+from PIL import Image
 import torch.nn as nn
+from collections import Counter
+from torch.utils.data import DataLoader
+from torchvision.transforms import ToTensor, ToPILImage
 from sklearn.metrics import accuracy_score, fbeta_score, precision_score, recall_score, confusion_matrix
+
 
 class AnimalDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, image_dir, transform=None, crop_bbox=False, label_map=None):
@@ -119,10 +120,10 @@ def extract_features(model, dataloader, device):
     labels = np.concatenate(labels, axis=0)
     return features, labels
 
-def cross_validation(base_dir, model, k, device, transform, label_map, model_feat=None):
+def cross_validation(base_dir, model, k, device, transform, label_map, model_feat=None, save_model_path=None):
 
     results = []
-
+    best_f1 = 0.0
     for fold_num in range(1, k+1):
         fold_dir = os.path.join(base_dir, f"fold_{fold_num}")
         
@@ -150,8 +151,15 @@ def cross_validation(base_dir, model, k, device, transform, label_map, model_fea
         val_accuracy = accuracy_score(y_test_validation, val_predictions)
         precision = precision_score(y_test_validation, val_predictions, zero_division=0, average=None)
         recall = recall_score(y_test_validation, val_predictions, zero_division=0, average=None)
-        f1score = fbeta_score(y_test_validation, val_predictions, beta=1, zero_division=0, average=None)
+        f1score = fbeta_score(y_test_validation, val_predictions, beta=1, zero_division=0, average="macro")
         conf = confusion_matrix(y_test_validation, val_predictions)
+
+        f1score_compare = f1score
+        if save_model_path is not None:
+            if f1score_compare > best_f1:
+                best_f1 = f1score_compare
+                joblib.dump(model, save_model_path)
+                print(f"Model saved at {save_model_path} with f1score {best_f1:.4f}")
                 
         # Save results for each folder
         results.append({
@@ -261,7 +269,6 @@ def evaluate_model(model, dataloader, device, label_map):
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
-    # Ricava classi presenti nel test
     unique_labels = sorted(list(set(all_labels + all_preds)))
     inv_label_map = {v: k for k, v in label_map.items()}
 
@@ -272,7 +279,8 @@ def evaluate_model(model, dataloader, device, label_map):
 def build_model(label_map, device, frozen=True):
     model = timm.create_model('vit_base_patch16_224', pretrained=True)
     model.head = nn.Linear(model.head.in_features, len(label_map))
-
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
+    criterion = nn.CrossEntropyLoss()
     if frozen:
         # Frozen the entire model except the head
         for param in model.parameters():
@@ -284,14 +292,15 @@ def build_model(label_map, device, frozen=True):
         for param in model.parameters():
             param.requires_grad = True
 
-    return model.to(device)
+    return model.to(device), optimizer, criterion
 
 
-def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5, frozen=True):
+def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5, frozen=True, save_model_path=None):
     results = []
     patience = 3
     best_val_acc = 0.0
     epochs_no_improve = 0
+    best_f1 = 0.0
 
     for fold_num in range(1, k + 1):
         # Load current fold datasets
@@ -306,9 +315,8 @@ def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5,
         test_loader = DataLoader(test_ds, batch_size=32, shuffle=False)
 
         # Build model
-        model = build_model(label_map, device, frozen=frozen)
-        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
-        criterion = nn.CrossEntropyLoss()
+        model,optimizer, criterion = build_model(label_map, device, frozen=frozen)
+        
         # Training loop
         for epoch in range(num_epochs):
             train_loss, train_acc = train_epoch(model, train_loader, optimizer, criterion, device)
@@ -329,7 +337,14 @@ def nn_cross_validation(base_dir, k, device, transform, label_map, num_epochs=5,
         val_accuracy = accuracy_score(all_labels, all_preds)
         precision = precision_score(all_labels, all_preds, zero_division=0, average=None)
         recall = recall_score(all_labels, all_preds, zero_division=0, average=None)
-        f1score = fbeta_score(all_labels, all_preds, beta=1, zero_division=0, average=None)
+        f1score = fbeta_score(all_labels, all_preds, beta=1, zero_division=0, average="macro")
+
+        f1score_compare = f1score
+        if save_model_path is not None:
+            if f1score_compare > best_f1:
+                best_f1 = f1score_compare
+                torch.save(model.state_dict(), save_model_path)
+                print(f"Model saved at {save_model_path} with f1score {best_f1:.4f}")
 
         # Save results for each folder
         results.append({

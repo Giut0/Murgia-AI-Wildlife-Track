@@ -1,9 +1,8 @@
+import os
 import re
 import cv2 as cv
 from PIL import Image
-import os
 from dateutil import parser
-
 
 def normalize_datetime(date_str):
     try:

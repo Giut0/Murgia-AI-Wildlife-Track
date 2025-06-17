@@ -1,6 +1,6 @@
+import os
 import pandas as pd
 from PIL import Image
-import os
 
 csv_path = 'data/labeled_img.csv'
 input_dir = 'data/labeled_img'
