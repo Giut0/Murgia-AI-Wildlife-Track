@@ -1,7 +1,7 @@
-from training_utils import augment_minority_classes
-from torchvision import transforms
-import pandas as pd
 import torch
+import pandas as pd
+from torchvision import transforms
+from training_utils import augment_minority_classes
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

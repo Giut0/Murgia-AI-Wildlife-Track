@@ -1,16 +1,16 @@
 import os
 import timm
 import torch
-import numpy as np
-from PIL import Image
-from collections import Counter
-from torchvision.transforms import ToTensor, ToPILImage
-from torch.utils.data import DataLoader
-import pandas as pd
-import timm
 import joblib
+import numpy as np
+import pandas as pd
+from PIL import Image
 import torch.nn as nn
+from collections import Counter
+from torch.utils.data import DataLoader
+from torchvision.transforms import ToTensor, ToPILImage
 from sklearn.metrics import accuracy_score, fbeta_score, precision_score, recall_score, confusion_matrix
+
 
 class AnimalDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, image_dir, transform=None, crop_bbox=False, label_map=None):
@@ -269,7 +269,6 @@ def evaluate_model(model, dataloader, device, label_map):
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.cpu().numpy())
 
-    # Ricava classi presenti nel test
     unique_labels = sorted(list(set(all_labels + all_preds)))
     inv_label_map = {v: k for k, v in label_map.items()}
 
